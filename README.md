@@ -8,69 +8,115 @@
 | 3  | Imam Mahmud Dalil Fauzan | 5027241100  |
 
 # SOAL 1
-1. Library yang diperlukan :
-     - Membuat direktori ```(sys/stat.h)```
-     - Input/output standar ```(stdio.h)```
-     - Manajemen memori ```(stdlib.h)```
-     - Operasi string ```(string.h)```
-     - System calls ```(unistd.h)```
-     - Socket programming ```(sys/socket.h, netinet/in.h, arpa/inet.h)```
-     - Waktu ```(time.h)```
-     - Directory operations ```(dirent.h)```
-     - Error handling ```(errno.h)```
 
-2. Konstanta:
-   - `PORT`: Port untuk koneksi ke server (8080)
-   - `BUFFER_SIZE`: Ukuran buffer untuk transfer data (1024 bytes)
-   - `SECRETS_DIR`: Lokasi file teks rahasia ("client/secrets")
-   - `OUTPUT_DIR`: Lokasi penyimpanan file hasil download ("client")
+Gambaran Umum Sistem
+Sistem ini terdiri dari dua komponen utama:
+1. **Client** - Aplikasi berbasis teks untuk berinteraksi dengan user
+2. **Server** - Layanan backend untuk memproses permintaan client
 
-3. Fungsi Utama:
-   - `display_menu()`: Menampilkan menu interaktif ke user
-   - `list_text_files()`: Menampilkan daftar file teks yang tersedia di folder secrets
-   - `connect_to_server()`: Membuat koneksi socket ke server
-   - `send_decrypt_request()`: Mengirim permintaan dekripsi file ke server
-   - `send_download_request()`: Mengirim permintaan download file ke server
-   - `main()`: Fungsi utama yang menjalankan loop menu dan memproses pilihan user
+Kedua komponen berkomunikasi melalui socket TCP pada port 8080 dengan protokol khusus.
 
-4. Alur Kerja Client:
-   - Menampilkan menu utama dengan 4 opsi
-   - Untuk setiap opsi:
-     1. List files: Menampilkan file teks yang ada di folder secrets
-     2. Decrypt: Mengirim isi file teks ke server untuk didekripsi
-     3. Download: Meminta file hasil dekripsi dari server
-     4. Exit: Keluar dari program
+Fungsi Utama Client
 
-5. Protokol Komunikasi dengan Server:
-     - DECRYPT:<isi_file_teks>: Untuk permintaan dekripsi
-     - DOWNLOAD:<nama_file>: Untuk permintaan download
-     - EXIT: Untuk memberitahu server client akan keluar
-     - Untuk dekripsi: Mengembalikan nama file hasil
-     - Untuk download: Mengirim ukuran file terlebih dahulu, lalu isi file
+1. Koneksi ke Server
+- `establish_server_connection()`:
+  - Membuat socket TCP dengan `socket()`
+  - Mengkonfigurasi alamat server (127.0.0.1:8080)
+  - Menghubungkan ke server dengan `connect()`
+  - Menangani berbagai error koneksi
 
-6. Fitur Penting:
-   - Validasi input user
-   - Penanganan error yang baik
-   - Pembuatan direktori otomatis jika belum ada
-   - Tampilan yang user-friendly
-   - Komunikasi yang jelas dengan server
+2. Operasi File
+- `fetch_server_file()`:
+  - Mengirim permintaan "DOWNLOAD <filename>"
+  - Menerima ukuran file dan konten file dari server
+  - Menyimpan file ke direktori "client/"
+  
+- `upload_for_processing()`:
+  - Mencari file di "client/secrets/"
+  - Mengirim permintaan "DECRYPT <path_file>"
+  - Menerima dan menampilkan respons server
 
-7. Struktur Direktori Client:
-   - File teks asli disimpan di client/secrets/
-   - File hasil download disimpan di client/
+3. Antarmuka Pengguna
+- `show_client_options()`: Menampilkan menu interaktif
+- `run_client_program()`: Loop utama untuk memproses input user
 
-8. Proses Transfer File:
-   - Untuk download, client menerima ukuran file terlebih dahulu
-   - Kemudian menerima data file per chunk (menggunakan buffer)
-   - Menyimpan file secara streaming untuk efisiensi memori
+Fungsi Utama Server
 
-Kode ini merupakan implementasi client yang berkomunikasi dengan server menggunakan socket TCP/IP, dengan antarmuka berbasis menu yang memungkinkan user untuk:
-- Melihat daftar file teks yang tersedia
-- Mengirim file teks untuk didekripsi oleh server
-- Mendownload file hasil dekripsi dari server
-- Keluar dari program dengan clean
+1. Inisialisasi
+- `initialize_server()`:
+  - Membuat direktori server dan database
+  - Menjalankan sebagai daemon (background process)
+  - Membuat socket dan binding ke port 8080
+  - Mencatat log startup
 
-kode ini dirancang untuk bekerja bersama dengan server yang telah dijelaskan sebelumnya, membentuk sistem RPC client-server yang lengkap.
+2. Proses Permintaan
+- `process_client_request()`:
+  - Menerima dan mengidentifikasi perintah client
+  - Memproses tiga jenis permintaan:
+    - DECRYPT: Membalik teks dan menyimpan sebagai .jpeg
+    - DOWNLOAD: Mengirim file ke client
+    - EXIT: Mencatat log tanpa aksi khusus
+
+3. Fitur Pendukung
+- `reverse_string()`: Membalikkan string input
+- `store_jpeg_file()`: Menyimpan konten sebagai file .jpeg
+- `record_event()`: Mencatat aktivitas ke server.log
+- `send_error_response()`: Mengirim pesan error ke client
+
+Protokol Komunikasi
+
+Format Permintaan Client:
+1. Download: `"DOWNLOAD nama_file"`
+2. Decrypt: `"DECRYPT path_lengkap_file"`
+3. Exit: `"EXIT"`
+
+Format Respons Server:
+1. Untuk Download:
+   - Mengirim ukuran file (long)
+   - Mengirim konten file biner
+2. Untuk Decrypt:
+   - Mengirim string konfirmasi penyimpanan
+3. Untuk Error:
+   - Mengirim string deskripsi error
+
+Struktur Direktori
+
+Client:
+- `client/` - Untuk menyimpan file yang didownload
+- `client/secrets/` - Untuk file yang akan diupload
+
+Server:
+- `server/` - Direktori utama
+- `server/database/` - Penyimpanan file hasil proses
+- `server/server.log` - Catatan aktivitas sistem
+
+Alur Kerja Sistem
+
+1. Client menghubungi server pada port 8080
+2. User memilih operasi melalui menu:
+   - Upload: File diambil dari secrets/, dikirim untuk diproses
+   - Download: Meminta file dari server database
+3. Server memproses permintaan:
+   - Decrypt: Membalik isi file dan simpan sebagai JPEG
+   - Download: Mengirim file dari database
+4. Hasil operasi dikembalikan ke client
+5. Semua aktivitas dicatat dalam server.log
+
+Penanganan Error
+
+1. Koneksi gagal
+2. File tidak ditemkan
+3. Gagal membuat/membuka file
+4. Input tidak valid
+
+Setiap error akan menghasilkan pesan ke user dan dicatat dalam log.
+
+Keamanan
+
+1. Server berjalan sebagai daemon
+2. Port dan alamat dikonfigurasi secara eksplisit
+3. Aktivitas tercatat lengkap dengan timestamp
+4. File hasil proses disimpan dengan nama unik (timestamp)
 
 # SOAL 2
 Soal ini ada dua program utama:
